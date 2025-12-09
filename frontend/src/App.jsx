@@ -321,11 +321,6 @@ function App() {
                       ))}
                     </div>
 
-                    <p className="hint" style={{ marginTop: "0.4rem" }}>
-                      {files.length} image
-                      {files.length > 1 ? "s" : ""} selected
-                    </p>
-
                     <button
                       type="button"
                       className="secondary-button"

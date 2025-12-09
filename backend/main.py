@@ -1,73 +1,121 @@
+import uuid
+from typing import List
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-from services.image_utils import validate_image
-from services.openai_service import analyze_car_damage
+from services.openai_service import analyze_damage_from_images
 from services.sheets_service import write_damage_report
 
-import uuid
+from dotenv import load_dotenv
+import os
+from io import BytesIO
+from PIL import Image
+
+load_dotenv()
 
 app = FastAPI(
-    title="Car Damage Analyzer",
-    description="Uploads a car image, uses OpenAI to detect exterior damage, and logs a report to Google Sheets.",
-    version="1.0.0",
+    title="Car Damage Analyzer API",
+    description="Upload car images, analyze damage with OpenAI, and log reports to Google Sheets.",
+    version="1.1.0",
 )
 
-# CORS so React frontend can call this API
+# Allow local dev + future frontend origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # for production, restrict this to your frontend domain
+    allow_origins=["*"],  # tighten later if you want
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+def _validate_image_bytes(image_bytes: bytes) -> None:
+    """Simple image validation using Pillow."""
+    try:
+        Image.open(BytesIO(image_bytes)).verify()
+    except Exception:
+        raise HTTPException(status_code=400, detail="One of the uploaded files is not a valid image.")
+
+
 @app.get("/")
-def health_check():
-    return {"status": "ok", "message": "Car damage API is running"}
+async def health_check():
+    return {
+        "status": "ok",
+        "message": "Car damage API is running",
+    }
 
 
 @app.post("/analyze")
-async def analyze_image(file: UploadFile = File(...)):
-    # Only allow JPEG/PNG
-    if file.content_type not in ("image/jpeg", "image/png"):
-        raise HTTPException(status_code=400, detail="Please upload a JPEG or PNG image.")
+async def analyze(
+    files: List[UploadFile] = File(
+        ...,
+        description="Upload one or more images of the SAME car (different angles recommended).",
+    )
+):
+    """
+    Analyze one or more car images.
 
-    image_bytes = await file.read()
+    - Validates each file as an image.
+    - Sends ALL images to OpenAI Vision in a single request.
+    - Gets a combined JSON damage report (no double-counting parts).
+    - Writes all parts to Google Sheets (master log + per-report tab).
+    - Returns the report_id, sheet_url, and the damage_report JSON.
+    """
 
-    # Validate actual image content
-    try:
-        validate_image(image_bytes)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if not files:
+        raise HTTPException(status_code=400, detail="No images uploaded.")
 
-    # Generate a report ID
-    report_id = str(uuid.uuid4())
+    # Read and validate all images
+    image_bytes_list: List[bytes] = []
+    for uploaded in files:
+        contents = await uploaded.read()
+        if not contents:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File '{uploaded.filename}' is empty.",
+            )
+        _validate_image_bytes(contents)
+        image_bytes_list.append(contents)
 
-    # 1) Call OpenAI to analyze damage
-    try:
-        damage_report = analyze_car_damage(image_bytes)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI analysis failed: {e}")
+    # Call OpenAI Vision with all images
+    damage_report = analyze_damage_from_images(image_bytes_list)
 
+    # Check if it's actually a car
     if not damage_report.get("is_car", False):
         raise HTTPException(
             status_code=400,
-            detail=damage_report.get("notes", "The uploaded image does not appear to be a car."),
+            detail=f"The uploaded images do not appear to be a car. Notes: {damage_report.get('notes', '')}",
         )
 
-    # 2) Write damage report to Google Sheets
+    # Generate a report_id for this request
+    report_id = str(uuid.uuid4())
+
+    # Write to Google Sheets (master + per-report tab)
     try:
         sheet_url = write_damage_report(report_id, damage_report)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Writing to Google Sheets failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Writing to Google Sheets failed: {e}",
+        )
 
-    return JSONResponse(
-        {
-            "report_id": report_id,
-            "sheet_url": sheet_url,
-            "damage_report": damage_report,
-        }
-    )
+    # If overall cost is missing, try to derive it from per-part totals
+    overall_cost = damage_report.get("overall_estimated_repair_cost")
+    if overall_cost is None:
+        parts = damage_report.get("parts", [])
+        total = 0.0
+        for p in parts:
+            if "estimated_total_part_cost" in p:
+                try:
+                    total += float(p["estimated_total_part_cost"])
+                except Exception:
+                    pass
+        if total > 0:
+            damage_report["overall_estimated_repair_cost"] = total
+
+    return {
+        "report_id": report_id,
+        "sheet_url": sheet_url,
+        "damage_report": damage_report,
+    }

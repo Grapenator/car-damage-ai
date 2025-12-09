@@ -1,0 +1,25 @@
+# --- Python backend ---
+backend/venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.env
+backend/service-account.json
+
+# Byte-compiled / cache
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# --- Node/React frontend (for later) ---
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/build/
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+
+# OS junk
+.DS_Store
+Thumbs.db

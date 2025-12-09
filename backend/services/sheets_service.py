@@ -1,10 +1,14 @@
 import os
+import json
 import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Prefer JSON in env var (for deployment), but still support a file (for local dev)
+SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "service-account.json")
+
 SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
 MASTER_SHEET_NAME = os.getenv("GOOGLE_SHEETS_TAB_NAME", "DamageReports")
 
@@ -17,21 +21,35 @@ try:
     from google.oauth2.service_account import Credentials
     from googleapiclient.discovery import build
 
-    if (
-        SPREADSHEET_ID
-        and os.path.exists(SERVICE_ACCOUNT_FILE)
-        and os.path.getsize(SERVICE_ACCOUNT_FILE) > 0
-    ):
-        creds = Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_FILE, scopes=SCOPES
-        )
+    creds = None
+
+    if SPREADSHEET_ID:
+        if SERVICE_ACCOUNT_JSON:
+            # Deployment-friendly: JSON stored directly in env var
+            sa_info = json.loads(SERVICE_ACCOUNT_JSON)
+            creds = Credentials.from_service_account_info(sa_info, scopes=SCOPES)
+            print("[Sheets] Using GOOGLE_SERVICE_ACCOUNT_JSON from env.")
+        elif os.path.exists(SERVICE_ACCOUNT_FILE) and os.path.getsize(SERVICE_ACCOUNT_FILE) > 0:
+            # Local dev fallback: JSON on disk
+            creds = Credentials.from_service_account_file(
+                SERVICE_ACCOUNT_FILE, scopes=SCOPES
+            )
+            print(f"[Sheets] Using service account file: {SERVICE_ACCOUNT_FILE}")
+        else:
+            print(
+                "[Sheets] No service account JSON or file found; running in STUB mode."
+            )
+
+    if SPREADSHEET_ID and creds is not None:
         _service = build("sheets", "v4", credentials=creds)
         _sheets_available = True
         print("[Sheets] Google Sheets client initialized (master + per-report tabs).")
     else:
-        print(
-            "[Sheets] Missing SPREADSHEET_ID or service account file; running in STUB mode."
-        )
+        if not SPREADSHEET_ID:
+            print(
+                "[Sheets] Missing SPREADSHEET_ID; running in STUB mode."
+            )
+
 except Exception as e:
     print(f"[Sheets] Failed to initialize Sheets client ({e}); running in STUB mode.")
     _sheets_available = False
@@ -73,7 +91,7 @@ def _header_row():
 def _build_rows_for_master(report_id: str, parts: list) -> list:
     """
     Rows for the master log sheet.
-    No formulas here – just raw numbers from the model.
+    No formulas here – just raw numbers from the model/backend.
     """
     date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     rows = []
@@ -123,7 +141,7 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
     if not parts:
         return f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit"
 
-    # 1) Append to master log tab (no formulas here)
+    # 1) Append to master log tab
     master_rows = _build_rows_for_master(report_id, parts)
     master_body = {"values": master_rows}
 
@@ -159,7 +177,7 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
 
         new_sheet_id = batch_resp["replies"][0]["addSheet"]["properties"]["sheetId"]
 
-        # 3) Write header row to the new tab
+        # 3) Header row
         header_body = {"values": _header_row()}
         _service.spreadsheets().values().update(
             spreadsheetId=SPREADSHEET_ID,
@@ -168,7 +186,7 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
             body=header_body,
         ).execute()
 
-        # 4) Build rows for this report tab (no per-row formulas)
+        # 4) Data rows for this report tab
         date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         report_rows = []
         for part in parts:
@@ -183,12 +201,11 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
                 part.get("estimated_paint_cost", ""),      # H
                 part.get("estimated_structural_cost", ""), # I
                 part.get("estimated_total_part_cost", ""), # J
-                "",                                        # K: part_number (user)
-                "",                                        # L: part_url    (user)
+                "",                                        # K: part_number
+                "",                                        # L: part_url
             ]
             report_rows.append(row)
 
-        # Add the data rows first
         report_body = {"values": report_rows}
         _service.spreadsheets().values().append(
             spreadsheetId=SPREADSHEET_ID,
@@ -198,8 +215,8 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
             body=report_body,
         ).execute()
 
-        # 5) Add a final TOTAL row that sums column J
-        last_part_row = len(parts) + 1  # header is row 1, parts start at row 2
+        # 5) Add TOTAL row with SUM over J
+        last_part_row = len(parts) + 1  # header is row 1
         total_row_index = last_part_row + 1
 
         total_formula = f"=SUM(J2:J{last_part_row})"
@@ -208,14 +225,10 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
             date_str,                        # B
             "TOTAL",                         # C
             "Total Estimated Repair Cost",   # D
-            "",                              # E
-            "",                              # F
-            "",                              # G
-            "",                              # H
+            "", "", "", "",                  # E–H
             "",                              # I
             total_formula,                   # J
-            "",                              # K
-            "",                              # L
+            "", "",                          # K–L
         ]
 
         _service.spreadsheets().values().update(
@@ -225,10 +238,9 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
             body={"values": [total_row]},
         ).execute()
 
-        # Direct link to this tab via gid
+        # Link directly to this tab
         return f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit#gid={new_sheet_id}"
 
     except Exception as e:
-        # If we fail to create a per-report tab, we still have the master log.
         print(f"[Sheets] Warning: failed to create per-report tab: {e}")
         return f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit"

@@ -24,7 +24,7 @@ app = FastAPI(
 # Allow local dev + future frontend origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten later if you want
+    allow_origins=["*"],  # Lock to Vercel Domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

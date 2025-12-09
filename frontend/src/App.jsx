@@ -1,10 +1,12 @@
 import { useState } from "react";
 import "./App.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 function App() {
   const [files, setFiles] = useState([]);
+  const [vehicleInfo, setVehicleInfo] = useState(""); // year / make / model
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null); // holds backend JSON
@@ -12,8 +14,32 @@ function App() {
   const handleFileChange = (event) => {
     setError("");
     setResult(null);
+
     const selected = Array.from(event.target.files || []);
-    setFiles(selected);
+
+    setFiles((prev) => {
+      // avoid exact duplicates (same name + lastModified)
+      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.lastModified}`));
+      const merged = [...prev];
+
+      for (const file of selected) {
+        const key = `${file.name}-${file.lastModified}`;
+        if (!existingKeys.has(key)) {
+          merged.push(file);
+        }
+      }
+
+      return merged;
+    });
+
+    // reset the input so picking the same file again will fire onChange
+    event.target.value = "";
+  };
+
+  const handleClearFiles = () => {
+    setFiles([]);
+    setResult(null);
+    setError("");
   };
 
   const handleSubmit = async (event) => {
@@ -32,6 +58,11 @@ function App() {
       formData.append("files", file);
     });
 
+    // optional vehicle_info field for the backend
+    if (vehicleInfo.trim()) {
+      formData.append("vehicle_info", vehicleInfo.trim());
+    }
+
     setIsSubmitting(true);
     try {
       const response = await fetch(`${API_BASE_URL}/analyze`, {
@@ -45,7 +76,10 @@ function App() {
         try {
           const errJson = await response.json();
           if (errJson.detail) {
-            detail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+            detail =
+              typeof errJson.detail === "string"
+                ? errJson.detail
+                : JSON.stringify(errJson.detail);
           }
         } catch {
           // ignore JSON parse error
@@ -65,7 +99,6 @@ function App() {
 
   const overallCost =
     result?.damage_report?.overall_estimated_repair_cost ?? null;
-
   const parts = result?.damage_report?.parts ?? [];
 
   return (
@@ -84,9 +117,29 @@ function App() {
           <h2>Upload images</h2>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
+              <label htmlFor="vehicleInfo">
+                Vehicle year, make, and model (optional but recommended)
+              </label>
+              <input
+                id="vehicleInfo"
+                type="text"
+                placeholder="e.g. 2006 Mitsubishi Lancer Evolution IX"
+                value={vehicleInfo}
+                onChange={(e) => setVehicleInfo(e.target.value)}
+              />
+              <p className="hint">
+                This helps the AI give more realistic parts and cost estimates.
+              </p>
+            </div>
+
+            <div className="form-group">
               <label htmlFor="fileInput">
                 Images of your car (multiple angles recommended)
               </label>
+              <p className="hint">
+                You can select several photos at once. On some phones you may need to tap
+                “Choose Files” multiple times to add more images.
+              </p>
               <input
                 id="fileInput"
                 type="file"
@@ -95,9 +148,24 @@ function App() {
                 onChange={handleFileChange}
               />
               {files.length > 0 && (
-                <p className="hint">
-                  Selected {files.length} file{files.length > 1 ? "s" : ""}.
-                </p>
+                <div className="selected-files">
+                  <p className="hint">
+                    Selected {files.length} file{files.length > 1 ? "s" : ""}:
+                  </p>
+                  <ul>
+                    {files.map((f) => (
+                      <li key={`${f.name}-${f.lastModified}`}>{f.name}</li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleClearFiles}
+                    disabled={isSubmitting}
+                  >
+                    Clear files
+                  </button>
+                </div>
               )}
             </div>
 
@@ -123,7 +191,7 @@ function App() {
               {overallCost !== null && (
                 <p>
                   <strong>Overall Estimated Repair Cost:</strong>{" "}
-                  ${overallCost.toLocaleString()}
+                  ${Number(overallCost).toLocaleString()}
                 </p>
               )}
             </div>

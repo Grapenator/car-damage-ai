@@ -1,7 +1,8 @@
 import os
 import base64
 import json
-from typing import List
+from json import JSONDecodeError
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -9,6 +10,8 @@ from openai import OpenAI
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY is not set in environment.")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -97,11 +100,14 @@ def _extract_json_block(text: str) -> str:
     - Strips ```json ... ``` fences if present.
     - Takes everything between the first '{' and the last '}'.
     """
-    # Remove ```json or ``` fences if the model wrapped the JSON
+    text = text.strip()
+
+    # Remove ```...``` fences if the model added them
     if text.startswith("```"):
-        # Drop leading ```json or ``` and trailing ```
+        # common patterns: ```json\n{...}\n``` or ```\n{...}\n```
+        # Strip leading/trailing backticks and language hints
         text = text.strip("`")
-        # After this, rest of the logic still applies
+        # After this, we still look for { ... }
 
     start = text.find("{")
     end = text.rfind("}")
@@ -111,16 +117,114 @@ def _extract_json_block(text: str) -> str:
     return text[start : end + 1]
 
 
-def analyze_damage_from_images(images: List[bytes]) -> dict:
+def _compute_closing_suffix(text: str) -> str:
+    """
+    Look at the text and find unmatched { or [ outside of strings.
+    Return the sequence of } and ] needed to close them in the correct order.
+    """
+    stack = []
+    in_string = False
+    escape = False
+
+    for ch in text:
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+
+        if ch in "{[":
+            stack.append(ch)
+        elif ch == "}" and stack and stack[-1] == "{":
+            stack.pop()
+        elif ch == "]" and stack and stack[-1] == "[":
+            stack.pop()
+
+    closing = []
+    for opener in reversed(stack):
+        closing.append("}" if opener == "{" else "]")
+    return "".join(closing)
+
+
+def _truncate_and_balance_json(text: str, error_pos: int) -> str:
+    """
+    If JSON decoding fails at some position (often because the model output
+    is truncated or has a half-written property), try:
+
+    - Truncate around the error line
+    - Remove a trailing comma if present
+    - Close any remaining { or [ with the correct } or ] in order
+    """
+    partial = text[:error_pos]
+
+    # Drop the incomplete line where the error occurred
+    last_nl = partial.rfind("\n")
+    if last_nl != -1:
+        partial = partial[:last_nl]
+
+    partial = partial.rstrip()
+
+    # If we end with a comma like `"foo": 123,` and then truncated, drop the comma
+    if partial.endswith(","):
+        partial = partial[:-1]
+
+    # Now append closing braces/brackets in the right order
+    suffix = _compute_closing_suffix(partial)
+    return partial + suffix
+
+
+def _parse_model_json(raw_text: str) -> dict:
+    """
+    Try increasingly aggressive ways to get a usable JSON object out of the model output.
+    1) Direct json.loads
+    2) Extract JSON block and json.loads
+    3) Truncate around the error position and balance braces/brackets
+    """
+    # 1) Direct attempt
+    try:
+        return json.loads(raw_text)
+    except JSONDecodeError:
+        pass
+
+    # 2) Try after extracting the JSON-looking block
+    cleaned = _extract_json_block(raw_text)
+    try:
+        return json.loads(cleaned)
+    except JSONDecodeError as e2:
+        # 3) Try to truncate and balance
+        try:
+            repaired = _truncate_and_balance_json(cleaned, e2.pos)
+            obj = json.loads(repaired)
+            print("[OpenAI] Repaired JSON by truncation; some parts may be missing.")
+            return obj
+        except JSONDecodeError as e3:
+            # At this point, bail out; let the caller surface a 500
+            print(f"[OpenAI] JSON repair also failed: {e3}")
+            print("Raw model text (truncated):", raw_text[:500])
+            raise
+
+
+def analyze_damage_from_images(
+    images: List[bytes], vehicle_info: Optional[str] = None
+) -> dict:
     """
     Call OpenAI Vision with ALL provided images and return a parsed JSON damage report.
 
     images: list of raw image bytes.
+    vehicle_info: optional string like "2006 Mitsubishi Lancer Evolution IX"
+                  to help the model estimate realistic part prices.
     """
     if not images:
         raise ValueError("No images provided for analysis.")
 
-    # Build the multi-modal input: first the text prompt, then each image.
+    # Build the multi-modal input: text prompt (and optional vehicle info),
+    # then each image.
     content = [
         {
             "type": "input_text",
@@ -128,21 +232,33 @@ def analyze_damage_from_images(images: List[bytes]) -> dict:
         }
     ]
 
+    if vehicle_info:
+        content.append(
+            {
+                "type": "input_text",
+                "text": (
+                    "Vehicle information from the user (use this when estimating costs): "
+                    f"{vehicle_info.strip()}"
+                ),
+            }
+        )
+
     for img_bytes in images:
         data_url = _encode_image_bytes(img_bytes)
         content.append(
             {
                 "type": "input_image",
-                # For the Responses API, image_url should be a STRING (URL or data URL),
-                # not an object with {"url": ...}.
+                # NOTE: For the Responses API, image_url must be a STRING (URL or data URL),
+                # not an object like {"url": ...}.
                 "image_url": data_url,
             }
         )
 
     try:
-        # NOTE: NO response_format here, because this client version doesn't support it.
+        # IMPORTANT: do NOT pass response_format here; this client version
+        # doesn't accept it and will throw the exact error you're seeing.
         response = client.responses.create(
-            model="gpt-4.1-mini",  # cost-effective and supports vision
+            model="gpt-4.1-mini",
             input=[
                 {
                     "role": "user",
@@ -152,27 +268,11 @@ def analyze_damage_from_images(images: List[bytes]) -> dict:
             max_output_tokens=800,
         )
     except Exception as e:
-        # If the API call itself fails (bad API key, quota, etc.), bubble it up.
         print(f"[OpenAI] Error calling API: {e}")
         raise
 
-    # --- Try to parse the model output as JSON ---
-
-    # Responses API: output[0].content[0].text is the text string
+    # Responses API: primary text lives here
     raw_text = response.output[0].content[0].text.strip()
 
-    # First attempt: direct JSON
-    try:
-        return json.loads(raw_text)
-    except json.JSONDecodeError:
-        # Second attempt: strip code fences / extra text and grab the JSON block
-        print("[OpenAI] Initial JSON decode failed, trying to clean the text...")
-        cleaned = _extract_json_block(raw_text)
-        try:
-            return json.loads(cleaned)
-        except json.JSONDecodeError as e:
-            # At this point, the model really didn't give valid JSON
-            print(f"[OpenAI] JSON decode failed after cleaning: {e}")
-            print("Raw model text (truncated):", raw_text[:500])
-            # Let this propagate as a 500 so you SEE the failure instead of a fake fallback
-            raise
+    # Parse/repair JSON as needed
+    return _parse_model_json(raw_text)

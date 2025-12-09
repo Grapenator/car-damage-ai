@@ -69,6 +69,18 @@ body {
   color: #e5e7eb;
 }
 
+input[type="text"] {
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid #4b5563;
+  background: #020617;
+  color: #e5e7eb;
+}
+
+input[type="text"]::placeholder {
+  color: #6b7280;
+}
+
 input[type="file"] {
   padding: 0.4rem;
   border-radius: 0.5rem;
@@ -99,9 +111,31 @@ button:not(:disabled):hover {
   box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
 }
 
+.secondary-button {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  color: #e5e7eb;
+  margin-top: 0.5rem;
+}
+
+.secondary-button:not(:disabled):hover {
+  box-shadow: 0 6px 14px rgba(148, 163, 184, 0.35);
+}
+
 .hint {
   font-size: 0.8rem;
   color: #9ca3af;
+}
+
+.selected-files {
+  margin-top: 0.25rem;
+}
+
+.selected-files ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.8rem;
+  color: #d1d5db;
 }
 
 .error {

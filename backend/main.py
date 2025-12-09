@@ -1,29 +1,27 @@
 import uuid
-from typing import List
+from typing import List, Optional
+from io import BytesIO
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
+from dotenv import load_dotenv
 
 from services.openai_service import analyze_damage_from_images
 from services.sheets_service import write_damage_report
-
-from dotenv import load_dotenv
-import os
-from io import BytesIO
-from PIL import Image
 
 load_dotenv()
 
 app = FastAPI(
     title="Car Damage Analyzer API",
     description="Upload car images, analyze damage with OpenAI, and log reports to Google Sheets.",
-    version="1.1.0",
+    version="1.2.0",
 )
 
 # Allow local dev + future frontend origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten later if you want
+    allow_origins=["*"],  # you can tighten this later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,7 +33,10 @@ def _validate_image_bytes(image_bytes: bytes) -> None:
     try:
         Image.open(BytesIO(image_bytes)).verify()
     except Exception:
-        raise HTTPException(status_code=400, detail="One of the uploaded files is not a valid image.")
+        raise HTTPException(
+            status_code=400,
+            detail="One of the uploaded files is not a valid image.",
+        )
 
 
 @app.get("/")
@@ -51,14 +52,18 @@ async def analyze(
     files: List[UploadFile] = File(
         ...,
         description="Upload one or more images of the SAME car (different angles recommended).",
-    )
+    ),
+    vehicle_info: Optional[str] = Form(
+        None,
+        description="Optional: year, make, and model (e.g., '2006 Mitsubishi Lancer Evolution IX').",
+    ),
 ):
     """
     Analyze one or more car images.
 
     - Validates each file as an image.
     - Sends ALL images to OpenAI Vision in a single request.
-    - Gets a combined JSON damage report (no double-counting parts).
+    - Gets a combined JSON damage report.
     - Writes all parts to Google Sheets (master log + per-report tab).
     - Returns the report_id, sheet_url, and the damage_report JSON.
     """
@@ -78,14 +83,25 @@ async def analyze(
         _validate_image_bytes(contents)
         image_bytes_list.append(contents)
 
-    # Call OpenAI Vision with all images
-    damage_report = analyze_damage_from_images(image_bytes_list)
+    # Call OpenAI Vision with all images (+ optional vehicle_info)
+    try:
+        damage_report = analyze_damage_from_images(
+            image_bytes_list, vehicle_info=vehicle_info
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"OpenAI analysis failed: {e}",
+        )
 
     # Check if it's actually a car
     if not damage_report.get("is_car", False):
         raise HTTPException(
             status_code=400,
-            detail=f"The uploaded images do not appear to be a car. Notes: {damage_report.get('notes', '')}",
+            detail=(
+                "The uploaded images do not appear to be a car. "
+                f"Notes: {damage_report.get('notes', '')}"
+            ),
         )
 
     # Generate a report_id for this request

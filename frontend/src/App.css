@@ -5,71 +5,60 @@
   background-color: #0f172a;
 }
 
-/* BODY = flex container that centers the root .app */
 body {
   margin: 0;
-  min-height: 100vh;
   background: radial-gradient(circle at top, #1e293b, #020617);
   color: #e5e7eb;
-
-  display: flex;
-  justify-content: center;   /* center horizontally */
-  align-items: flex-start;   /* top-align vertically */
 }
 
-/* ROOT APP is now a centered column with a max width */
+/* Center the app on the page */
+.page-root {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
 .app {
   width: 100%;
-  max-width: 1100px;         /* controls overall content width */
+  max-width: 1100px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding-bottom: 2rem;
-  box-sizing: border-box;
+  margin: 1.5rem;              /* spacing from edges of the viewport */
 }
 
-/* ---------- HEADER ---------- */
-
 .app-header {
-  padding: 1.5rem 1rem 0.5rem;
+  padding: 0 0 0.5rem;
+  text-align: center;
   color: #f9fafb;
 }
 
-.app-header-inner {
-  text-align: center;
-}
-
-.app-header-inner h1 {
+.app-header h1 {
   margin: 0 0 0.5rem;
   font-size: 2rem;
 }
 
-.app-header-inner p {
+.app-header p {
   margin: 0;
   color: #9ca3af;
 }
 
-/* ---------- MAIN LAYOUT ---------- */
-
 .app-main {
-  flex: 1;
-  padding: 1.5rem 1rem 0;
+  padding-top: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  box-sizing: border-box;
 }
 
-/* ---------- CARDS & FORM ---------- */
+/* ...rest of your existing styles (cards, table, buttons, etc.) ... */
 
 .card {
-  width: 100%;               /* fill the centered .app width */
   background: rgba(15, 23, 42, 0.95);
   border-radius: 1rem;
   padding: 1.5rem;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(148, 163, 184, 0.25);
-  box-sizing: border-box;
 }
 
 .card h2 {
@@ -159,8 +148,6 @@ button:not(:disabled):hover {
   color: #d1d5db;
 }
 
-/* ---------- STATUS / TABLE ---------- */
-
 .error {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
@@ -204,6 +191,147 @@ tr:nth-child(even) td {
   background: rgba(15, 23, 42, 0.6);
 }
 
+/* -------- Damage diagram styles -------- */
+
+.diagram-heading {
+  margin-top: 1.5rem;
+}
+
+.diagram-layout {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-areas:
+    ". front ."
+    "left center right"
+    ". rear ."
+    "other other other";
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.diagram-zone {
+  background: rgba(15, 23, 42, 0.85);
+  border-radius: 0.9rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.zone-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9ca3af;
+}
+
+.zone-empty {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Grid areas */
+
+.zone-front {
+  grid-area: front;
+}
+
+.zone-left {
+  grid-area: left;
+}
+
+.zone-right {
+  grid-area: right;
+}
+
+.zone-rear {
+  grid-area: rear;
+}
+
+.zone-other {
+  grid-area: other;
+}
+
+.diagram-center {
+  grid-area: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.diagram-center span {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  font-size: 0.85rem;
+  color: #e5e7eb;
+}
+
+/* Individual nodes */
+
+.diagram-node {
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.7rem;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.node-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.node-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.node-severity {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(55, 65, 81, 0.9);
+  color: #e5e7eb;
+}
+
+.node-cost {
+  font-weight: 600;
+  color: #facc15;
+}
+
+/* Severity border colors */
+
+.severity-1 {
+  border-color: rgba(22, 163, 74, 0.4);
+}
+
+.severity-2 {
+  border-color: rgba(34, 197, 94, 0.6);
+}
+
+.severity-3 {
+  border-color: rgba(250, 204, 21, 0.7);
+}
+
+.severity-4 {
+  border-color: rgba(249, 115, 22, 0.8);
+}
+
+.severity-5 {
+  border-color: rgba(239, 68, 68, 0.9);
+}
+
+/* Sheet link */
+
 .sheet-link {
   margin-top: 1rem;
 }
@@ -218,51 +346,33 @@ tr:nth-child(even) td {
   text-decoration: underline;
 }
 
-/* ---------- MOBILE RESPONSIVE ---------- */
+/* Mobile tweaks */
 
-@media (max-width: 768px) {
-  .app-header-inner h1 {
-    font-size: 1.6rem;
+@media (max-width: 640px) {
+  .app-main {
+    padding: 1rem;
   }
 
   .card {
     padding: 1.1rem;
   }
 
-  .app-main {
-    padding: 1rem 0.75rem 1.5rem;
-  }
-
-  button,
-  .secondary-button {
-    width: 100%;
-    justify-content: center;
+  .app-header h1 {
+    font-size: 1.6rem;
   }
 
   table {
     font-size: 0.8rem;
   }
 
-  th,
-  td {
-    padding: 0.45rem 0.45rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .app-header {
-    padding-top: 1rem;
-  }
-
-  .app-header-inner h1 {
-    font-size: 1.4rem;
-  }
-
-  .app-header-inner p {
-    font-size: 0.9rem;
-  }
-
-  .card h2 {
-    font-size: 1.1rem;
+  .diagram-layout {
+    grid-template-areas:
+      "center"
+      "front"
+      "left"
+      "right"
+      "rear"
+      "other";
+    grid-template-columns: 1fr;
   }
 }

@@ -1,27 +1,29 @@
 import uuid
-from typing import List, Optional
-from io import BytesIO
+from typing import List
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
-from dotenv import load_dotenv
 
 from services.openai_service import analyze_damage_from_images
 from services.sheets_service import write_damage_report
+
+from dotenv import load_dotenv
+import os
+from io import BytesIO
+from PIL import Image
 
 load_dotenv()
 
 app = FastAPI(
     title="Car Damage Analyzer API",
     description="Upload car images, analyze damage with OpenAI, and log reports to Google Sheets.",
-    version="1.2.0",
+    version="1.1.0",
 )
 
 # Allow local dev + future frontend origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # you can tighten this later
+    allow_origins=["*"],  # tighten later if you want
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,10 +35,7 @@ def _validate_image_bytes(image_bytes: bytes) -> None:
     try:
         Image.open(BytesIO(image_bytes)).verify()
     except Exception:
-        raise HTTPException(
-            status_code=400,
-            detail="One of the uploaded files is not a valid image.",
-        )
+        raise HTTPException(status_code=400, detail="One of the uploaded files is not a valid image.")
 
 
 @app.get("/")
@@ -53,8 +52,8 @@ async def analyze(
         ...,
         description="Upload one or more images of the SAME car (different angles recommended).",
     ),
-    vehicle_info: Optional[str] = Form(
-        None,
+    vehicle_info: str | None = File(
+        default=None,
         description="Optional: year, make, and model (e.g., '2006 Mitsubishi Lancer Evolution IX').",
     ),
 ):
@@ -85,9 +84,7 @@ async def analyze(
 
     # Call OpenAI Vision with all images (+ optional vehicle_info)
     try:
-        damage_report = analyze_damage_from_images(
-            image_bytes_list, vehicle_info=vehicle_info
-        )
+        damage_report = analyze_damage_from_images(image_bytes_list, vehicle_info=vehicle_info)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -98,11 +95,20 @@ async def analyze(
     if not damage_report.get("is_car", False):
         raise HTTPException(
             status_code=400,
-            detail=(
-                "The uploaded images do not appear to be a car. "
-                f"Notes: {damage_report.get('notes', '')}"
-            ),
+            detail=f"The uploaded images do not appear to be a car. Notes: {damage_report.get('notes', '')}",
         )
+
+    # --- ALWAYS recompute overall_estimated_repair_cost from part totals ---
+    parts = damage_report.get("parts", []) or []
+    total_from_parts = 0.0
+    for p in parts:
+        try:
+            total_from_parts += float(p.get("estimated_total_part_cost") or 0)
+        except (TypeError, ValueError):
+            # ignore bad values and keep going
+            continue
+
+    damage_report["overall_estimated_repair_cost"] = round(total_from_parts, 2)
 
     # Generate a report_id for this request
     report_id = str(uuid.uuid4())
@@ -115,20 +121,6 @@ async def analyze(
             status_code=500,
             detail=f"Writing to Google Sheets failed: {e}",
         )
-
-    # If overall cost is missing, try to derive it from per-part totals
-    overall_cost = damage_report.get("overall_estimated_repair_cost")
-    if overall_cost is None:
-        parts = damage_report.get("parts", [])
-        total = 0.0
-        for p in parts:
-            if "estimated_total_part_cost" in p:
-                try:
-                    total += float(p["estimated_total_part_cost"])
-                except Exception:
-                    pass
-        if total > 0:
-            damage_report["overall_estimated_repair_cost"] = total
 
     return {
         "report_id": report_id,

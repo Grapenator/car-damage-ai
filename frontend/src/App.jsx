@@ -19,7 +19,9 @@ function App() {
 
     setFiles((prev) => {
       // avoid exact duplicates (same name + lastModified)
-      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.lastModified}`));
+      const existingKeys = new Set(
+        prev.map((f) => `${f.name}-${f.lastModified}`)
+      );
       const merged = [...prev];
 
       for (const file of selected) {
@@ -137,8 +139,8 @@ function App() {
                 Images of your car (multiple angles recommended)
               </label>
               <p className="hint">
-                You can select several photos at once. On some phones you may need to tap
-                “Choose Files” multiple times to add more images.
+                You can select several photos at once. On some phones you may need
+                to tap “Choose Files” multiple times to add more images.
               </p>
               <input
                 id="fileInput"
@@ -207,7 +209,6 @@ function App() {
                       <th>Part Name</th>
                       <th>Description</th>
                       <th>Severity (1–5)</th>
-                      <th>Labor Hours</th>
                       <th>Material Cost ($)</th>
                       <th>Paint Cost ($)</th>
                       <th>Structural Cost ($)</th>
@@ -220,7 +221,6 @@ function App() {
                         <td>{part.part_name}</td>
                         <td>{part.damage_description}</td>
                         <td>{part.severity}</td>
-                        <td>{part.estimated_labor_hours}</td>
                         <td>{part.estimated_material_cost}</td>
                         <td>{part.estimated_paint_cost}</td>
                         <td>{part.estimated_structural_cost}</td>

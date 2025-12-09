@@ -28,12 +28,11 @@ The user uploads between 1 and 10 photos of a vehicle. Your job is to:
 
 For each distinct damaged part, you must estimate:
 - severity: integer 1–5 (5 = worst / heavy damage)
-- estimated_labor_hours: hours to repair/replace, decimal ok (e.g., 2.5)
 - estimated_material_cost: parts + materials cost in USD (rough ballpark, not exact)
 - estimated_paint_cost: paint/blend cost in USD if relevant, otherwise 0
 - estimated_structural_cost: structural/frame/support-related cost in USD if relevant, otherwise 0
 - estimated_total_part_cost: total estimated cost in USD for this part ONLY
-  (labor + materials + paint + structural).
+  (materials + paint + structural + any implied labor).
 
 Finally, compute:
 - overall_estimated_repair_cost: total estimated cost in USD for repairing ALL visible damage
@@ -53,7 +52,6 @@ You MUST respond with EXACTLY ONE valid JSON object that conforms to this struct
       "part_name": "Front Bumper",
       "damage_description": "Cracked and scraped on the right side.",
       "severity": 4,
-      "estimated_labor_hours": 3.0,
       "estimated_material_cost": 600.0,
       "estimated_paint_cost": 300.0,
       "estimated_structural_cost": 0.0,
@@ -248,7 +246,7 @@ def analyze_damage_from_images(
         content.append(
             {
                 "type": "input_image",
-                # NOTE: For the Responses API, image_url must be a STRING (URL or data URL),
+                # For the Responses API, image_url must be a STRING (URL or data URL),
                 # not an object like {"url": ...}.
                 "image_url": data_url,
             }
@@ -256,7 +254,7 @@ def analyze_damage_from_images(
 
     try:
         # IMPORTANT: do NOT pass response_format here; this client version
-        # doesn't accept it and will throw the exact error you're seeing.
+        # doesn't accept it.
         response = client.responses.create(
             model="gpt-4.1-mini",
             input=[

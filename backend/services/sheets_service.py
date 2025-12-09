@@ -8,7 +8,6 @@ SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "service-account
 SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
 MASTER_SHEET_NAME = os.getenv("GOOGLE_SHEETS_TAB_NAME", "DamageReports")
 
-# We only need Sheets scope; Drive sharing is handled manually via the UI.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 _sheets_available = False
@@ -40,52 +39,41 @@ except Exception as e:
 
 def _header_row():
     """
-    Shared header for both the master log and per-report tabs.
+    Simpler schema – no row-level calculations, no extra cost fields.
 
-    Columns:
-      A: report_id
-      B: date
-      C: part_id
-      D: part_name
-      E: damage_description
-      F: severity
-      G: estimated_labor_hours
-      H: estimated_material_cost
-      I: estimated_paint_cost
-      J: estimated_structural_cost
-      K: estimated_total_part_cost
-      L: part_number        (user later)
-      M: part_url           (user later)
-      N: part_cost          (user later)
-      O: labor_rate         (user later)
-      P: total_cost         (formula/user)
+    A: report_id
+    B: date
+    C: part_id
+    D: part_name
+    E: damage_description
+    F: severity
+    G: estimated_material_cost
+    H: estimated_paint_cost
+    I: estimated_structural_cost
+    J: estimated_total_part_cost
+    K: part_number      (user optional)
+    L: part_url         (user optional)
     """
     return [[
-        "report_id",                  # A
-        "date",                       # B
-        "part_id",                    # C
-        "part_name",                  # D
-        "damage_description",         # E
-        "severity",                   # F
-        "estimated_labor_hours",      # G
-        "estimated_material_cost",    # H
-        "estimated_paint_cost",       # I
-        "estimated_structural_cost",  # J
-        "estimated_total_part_cost",  # K
-        "part_number",                # L
-        "part_url",                   # M
-        "part_cost",                  # N
-        "labor_rate",                 # O
-        "total_cost",                 # P
+        "report_id",                 # A
+        "date",                      # B
+        "part_id",                   # C
+        "part_name",                 # D
+        "damage_description",        # E
+        "severity",                  # F
+        "estimated_material_cost",   # G
+        "estimated_paint_cost",      # H
+        "estimated_structural_cost", # I
+        "estimated_total_part_cost", # J
+        "part_number",               # K (user later)
+        "part_url",                  # L (user later)
     ]]
 
 
 def _build_rows_for_master(report_id: str, parts: list) -> list:
     """
     Rows for the master log sheet.
-
-    The master log stores all estimated values and leaves the user-editable
-    cost fields blank.
+    No formulas here – just raw numbers from the model.
     """
     date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     rows = []
@@ -97,16 +85,12 @@ def _build_rows_for_master(report_id: str, parts: list) -> list:
             part.get("part_name", ""),                   # D
             part.get("damage_description", ""),          # E
             part.get("severity", ""),                    # F
-            part.get("estimated_labor_hours", ""),       # G
-            part.get("estimated_material_cost", ""),     # H
-            part.get("estimated_paint_cost", ""),        # I
-            part.get("estimated_structural_cost", ""),   # J
-            part.get("estimated_total_part_cost", ""),   # K
-            "",                                          # L: part_number (user later)
-            "",                                          # M: part_url    (user later)
-            "",                                          # N: part_cost   (user later)
-            "",                                          # O: labor_rate  (user later)
-            "",                                          # P: total_cost  (formula/user later)
+            part.get("estimated_material_cost", ""),     # G
+            part.get("estimated_paint_cost", ""),        # H
+            part.get("estimated_structural_cost", ""),   # I
+            part.get("estimated_total_part_cost", ""),   # J
+            "",                                          # K: part_number (user)
+            "",                                          # L: part_url    (user)
         ]
         rows.append(row)
     return rows
@@ -118,18 +102,13 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
       1) Append all parts to the MASTER_SHEET_NAME tab (global log).
       2) Create a new tab inside the same spreadsheet just for this report:
          - Name: "Report_<short_id>"
-         - Write header row to A1:P1
-         - Write this report's rows to A2:P...
-           - Columns H–K hold the AI's cost estimates.
-           - Columns L–O are empty for the user to fill in.
-           - Column P contains a formula:
-               =IF(AND(Nn<>"",On<>""), Nn + (Gn * On), "")
-         - Add one extra row at the bottom:
-               "Total Estimated Repair Cost" with K = SUM(K2:K_last)
+         - Write header row to A1:L1
+         - Write this report's rows to A2:...
+         - Append a final "TOTAL" row with SUM over estimated_total_part_cost.
       3) Return a URL that jumps directly to the new tab.
     """
 
-    parts = damage_json.get("parts", []) or []
+    parts = damage_json.get("parts", [])
 
     # STUB MODE: no real Sheets configured
     if not _sheets_available:
@@ -189,79 +168,27 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
             body=header_body,
         ).execute()
 
-        # 4) Build rows for this report tab, with formulas in total_cost (column P)
+        # 4) Build rows for this report tab (no per-row formulas)
         date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         report_rows = []
-
-        start_row = 2  # first data row
-        for row_index, part in enumerate(parts, start=start_row):
-            # Column P formula uses part_cost (N) and labor_rate (O) plus labor hours (G)
-            total_cost_formula = (
-                f'=IF(AND(N{row_index}<>"",O{row_index}<>""), '
-                f'N{row_index} + (G{row_index} * O{row_index}), "")'
-            )
-
+        for part in parts:
             row = [
-                report_id,                              # A: report_id
-                date_str,                               # B: date
-                part.get("part_id", ""),                # C
-                part.get("part_name", ""),              # D
-                part.get("damage_description", ""),     # E
-                part.get("severity", ""),               # F
-                part.get("estimated_labor_hours", ""),  # G
-                part.get("estimated_material_cost", ""),     # H
-                part.get("estimated_paint_cost", ""),        # I
-                part.get("estimated_structural_cost", ""),   # J
-                part.get("estimated_total_part_cost", ""),   # K
-                "",                                     # L: part_number (user later)
-                "",                                     # M: part_url    (user later)
-                "",                                     # N: part_cost   (user later)
-                "",                                     # O: labor_rate  (user later)
-                total_cost_formula,                     # P: total_cost (auto formula)
+                report_id,                                 # A
+                date_str,                                  # B
+                part.get("part_id", ""),                   # C
+                part.get("part_name", ""),                 # D
+                part.get("damage_description", ""),        # E
+                part.get("severity", ""),                  # F
+                part.get("estimated_material_cost", ""),   # G
+                part.get("estimated_paint_cost", ""),      # H
+                part.get("estimated_structural_cost", ""), # I
+                part.get("estimated_total_part_cost", ""), # J
+                "",                                        # K: part_number (user)
+                "",                                        # L: part_url    (user)
             ]
             report_rows.append(row)
 
-        # 5) Summary row: Total Estimated Repair Cost (sum of K)
-        if parts:
-            last_part_row = start_row + len(parts) - 1
-            summary_row_index = last_part_row + 1
-            sum_formula = f"=SUM(K{start_row}:K{last_part_row})"
-
-            summary_row = [
-                report_id,                     # A
-                date_str,                      # B
-                "TOTAL",                       # C
-                "Total Estimated Repair Cost", # D
-                "", "", "", "", "", "",        # E–K
-                sum_formula,                   # K: formula
-                "", "", "", "",                # L–P (leave blank)
-            ]
-
-            # ^ count carefully: we need 16 cells total
-            # A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P
-            # We've given A,B,C,D, five empty (E–I), then two empty (J?), need to ensure right length.
-            # Let's just expand manually:
-            summary_row = [
-                report_id,                     # A
-                date_str,                      # B
-                "TOTAL",                       # C
-                "Total Estimated Repair Cost", # D
-                "",                            # E
-                "",                            # F
-                "",                            # G
-                "",                            # H
-                "",                            # I
-                "",                            # J
-                sum_formula,                   # K
-                "",                            # L
-                "",                            # M
-                "",                            # N
-                "",                            # O
-                "",                            # P
-            ]
-
-            report_rows.append(summary_row)
-
+        # Add the data rows first
         report_body = {"values": report_rows}
         _service.spreadsheets().values().append(
             spreadsheetId=SPREADSHEET_ID,
@@ -269,6 +196,33 @@ def write_damage_report(report_id: str, damage_json: dict) -> str:
             valueInputOption="USER_ENTERED",
             insertDataOption="INSERT_ROWS",
             body=report_body,
+        ).execute()
+
+        # 5) Add a final TOTAL row that sums column J
+        last_part_row = len(parts) + 1  # header is row 1, parts start at row 2
+        total_row_index = last_part_row + 1
+
+        total_formula = f"=SUM(J2:J{last_part_row})"
+        total_row = [
+            report_id,                       # A
+            date_str,                        # B
+            "TOTAL",                         # C
+            "Total Estimated Repair Cost",   # D
+            "",                              # E
+            "",                              # F
+            "",                              # G
+            "",                              # H
+            "",                              # I
+            total_formula,                   # J
+            "",                              # K
+            "",                              # L
+        ]
+
+        _service.spreadsheets().values().update(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"{sheet_title}!A{total_row_index}",
+            valueInputOption="USER_ENTERED",
+            body={"values": [total_row]},
         ).execute()
 
         # Direct link to this tab via gid

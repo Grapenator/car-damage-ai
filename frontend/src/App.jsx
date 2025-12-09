@@ -106,12 +106,14 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Car Damage Analyzer</h1>
-        <p>
-          Upload one or more photos of the <strong>same car</strong>. The AI will
-          estimate damaged parts, severity, and repair costs, then log a report to
-          Google Sheets.
-        </p>
+        <div className="app-header-inner">
+          <h1>Car Damage Analyzer</h1>
+          <p>
+            Upload one or more photos of the <strong>same car</strong>. The AI
+            will estimate damaged parts, severity, and repair costs, then log a
+            report to Google Sheets.
+          </p>
+        </div>
       </header>
 
       <main className="app-main">
@@ -139,8 +141,8 @@ function App() {
                 Images of your car (multiple angles recommended)
               </label>
               <p className="hint">
-                You can select several photos at once. On some phones you may need
-                to tap “Choose Files” multiple times to add more images.
+                You can select several photos at once. On some phones you may
+                need to tap “Choose Files” multiple times to add more images.
               </p>
               <input
                 id="fileInput"

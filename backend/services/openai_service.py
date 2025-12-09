@@ -31,8 +31,6 @@ For each distinct damaged part, you must estimate:
 - estimated_material_cost: parts + materials cost in USD (rough ballpark, not exact)
 - estimated_paint_cost: paint/blend cost in USD if relevant, otherwise 0
 - estimated_structural_cost: structural/frame/support-related cost in USD if relevant, otherwise 0
-- estimated_total_part_cost: total estimated cost in USD for this part ONLY
-  (materials + paint + structural + any implied labor).
 
 Finally, compute:
 - overall_estimated_repair_cost: total estimated cost in USD for repairing ALL visible damage
@@ -54,8 +52,7 @@ You MUST respond with EXACTLY ONE valid JSON object that conforms to this struct
       "severity": 4,
       "estimated_material_cost": 600.0,
       "estimated_paint_cost": 300.0,
-      "estimated_structural_cost": 0.0,
-      "estimated_total_part_cost": 1200.0
+      "estimated_structural_cost": 0.0
     }
   ]
 }
@@ -102,10 +99,9 @@ def _extract_json_block(text: str) -> str:
 
     # Remove ```...``` fences if the model added them
     if text.startswith("```"):
-        # common patterns: ```json\n{...}\n``` or ```\n{...}\n```
+        # common patterns: ```json\\n{...}\\n``` or ```\\n{...}\\n```
         # Strip leading/trailing backticks and language hints
         text = text.strip("`")
-        # After this, we still look for { ... }
 
     start = text.find("{")
     end = text.rfind("}")

@@ -5,10 +5,18 @@
   background-color: #0f172a;
 }
 
+/* Make sizing predictable everywhere */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   background: radial-gradient(circle at top, #1e293b, #020617);
   color: #e5e7eb;
+  overflow-x: hidden; /* prevent sideways scroll from any tiny overflow */
 }
 
 /* Center the app on the page */
@@ -25,7 +33,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  margin: 1.5rem;              /* spacing from edges of the viewport */
+  margin: 1.5rem; /* spacing from edges of the viewport */
 }
 
 .app-header {
@@ -51,14 +59,20 @@ body {
   gap: 1.5rem;
 }
 
-/* ...rest of your existing styles (cards, table, buttons, etc.) ... */
-
 .card {
   background: rgba(15, 23, 42, 0.95);
   border-radius: 1rem;
   padding: 1.5rem;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(148, 163, 184, 0.25);
+  width: 100%;
+}
+
+/* Make any images behave nicely by default */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 .card h2 {
@@ -89,14 +103,6 @@ input[type="text"] {
 
 input[type="text"]::placeholder {
   color: #6b7280;
-}
-
-input[type="file"] {
-  padding: 0.4rem;
-  border-radius: 0.5rem;
-  border: 1px solid #4b5563;
-  background: #020617;
-  color: #e5e7eb;
 }
 
 button {
@@ -138,14 +144,75 @@ button:not(:disabled):hover {
 }
 
 .selected-files {
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
 }
 
-.selected-files ul {
-  margin: 0.25rem 0 0;
-  padding-left: 1.25rem;
-  font-size: 0.8rem;
-  color: #d1d5db;
+/* grid of image thumbnails */
+.thumbnail-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.thumb {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  background: #020617;
+  flex: 0 0 auto;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Red minus-circle remove button */
+.thumb-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0; /* override global button padding */
+  border-radius: 999px;
+  border: none;
+  background: rgba(239, 68, 68, 0.95); /* red */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+.thumb-remove-icon {
+  width: 12px;
+  height: 2px;
+  border-radius: 999px;
+  background: #f9fafb; /* white minus bar */
+}
+
+/* Show/remove button on hover or keyboard focus (desktop) */
+.thumb:hover .thumb-remove,
+.thumb:focus-within .thumb-remove {
+  opacity: 1;
+  transform: translateY(0);
+  box-shadow: 0 6px 12px rgba(239, 68, 68, 0.6);
+}
+
+/* Make sure global button hover doesn't override ours */
+.thumb-remove:hover {
+  transform: translateY(0);
 }
 
 .error {
@@ -158,19 +225,83 @@ button:not(:disabled):hover {
   font-size: 0.9rem;
 }
 
+/* Upload row: keep it from overflowing the card */
+.file-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+/* Visually hide the native input but keep it accessible */
+.file-input-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Pretty upload button */
+.file-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.2rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #f9fafb;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.file-upload-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
+}
+
+.file-upload-button:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 12px rgba(34, 197, 94, 0.25);
+}
+
+.file-upload-label {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  flex: 1 1 0;
+  min-width: 0;
+  word-break: break-word;
+}
+
 .summary p {
   margin: 0.25rem 0;
 }
 
+/* Make table scroll inside card instead of blowing out layout */
 .table-wrapper {
   margin-top: 0.75rem;
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
+  min-width: 600px; /* allows scroll on very small screens instead of squishing too hard */
 }
 
 th,
@@ -208,6 +339,8 @@ tr:nth-child(even) td {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   align-items: stretch;
+  width: 100%;
+  max-width: 100%;
 }
 
 .diagram-zone {
@@ -346,11 +479,20 @@ tr:nth-child(even) td {
   text-decoration: underline;
 }
 
-/* Mobile tweaks */
+/* ---------- Mobile tweaks ---------- */
 
 @media (max-width: 640px) {
+  .page-root {
+    align-items: stretch; /* let content go full-width top-to-bottom */
+  }
+
+  .app {
+    margin: 1rem 0.75rem;
+    min-height: auto;
+  }
+
   .app-main {
-    padding: 1rem;
+    padding: 0;
   }
 
   .card {
@@ -359,6 +501,44 @@ tr:nth-child(even) td {
 
   .app-header h1 {
     font-size: 1.6rem;
+  }
+
+  .app-header p {
+    font-size: 0.9rem;
+  }
+
+  button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .file-input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .file-upload-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .file-upload-label {
+    font-size: 0.8rem;
+  }
+
+  .thumbnail-grid {
+    gap: 0.5rem;
+  }
+
+  .thumb {
+    width: 80px;
+    height: 80px;
+  }
+
+  /* Show remove button always on mobile (no hover) */
+  .thumb-remove {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   table {

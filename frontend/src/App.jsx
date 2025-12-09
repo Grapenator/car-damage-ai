@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
-// ---------- small helpers for diagram ----------
+// ---------- helpers for diagram positioning ----------
 
-// Decide which area of the car a part belongs to
 function mapPartToZone(part) {
   const id = (part.part_id || "").toLowerCase();
   const name = (part.part_name || "").toLowerCase();
@@ -17,23 +16,20 @@ function mapPartToZone(part) {
   const hasFront = text.includes("front");
   const hasRear = text.includes("rear");
 
-  // ---- Explicit rear stuff: trunk, hatch, quarter panel, rear bumper ----
+  // Rear: trunk / hatch / quarter panel / rear bumper
   if (
     text.includes("trunk") ||
     text.includes("decklid") ||
     text.includes("tailgate") ||
     text.includes("hatch") ||
     text.includes("quarter panel") ||
-    text.includes("quarter_panel")
+    text.includes("quarter_panel") ||
+    text.includes("rear bumper")
   ) {
     return "rear";
   }
 
-  if (text.includes("rear bumper")) {
-    return "rear";
-  }
-
-  // ---- Side parts: doors, mirrors, rocker panel, side skirt ----
+  // Side parts: doors, mirrors, rocker, skirts
   const isSidePart =
     text.includes("door") ||
     text.includes("mirror") ||
@@ -44,13 +40,12 @@ function mapPartToZone(part) {
     text.includes("sideskirt");
 
   if (isSidePart) {
-    // doors, mirrors, rocker, skirts ⇒ left/right side if we can tell
     if (hasLeft) return "left";
     if (hasRight) return "right";
     return "other";
   }
 
-  // ---- Front parts: hood, radiator/core support, bumper, grille, headlights ----
+  // Front parts: hood, radiator/core support, bumper, grille, headlights
   if (
     text.includes("hood") ||
     text.includes("radiator") ||
@@ -68,11 +63,11 @@ function mapPartToZone(part) {
     return "front";
   }
 
-  // ---- Generic side zones (fenders, wheels, etc. that just say left/right) ----
+  // Generic left/right if mentioned
   if (hasLeft) return "left";
   if (hasRight) return "right";
 
-  // ---- Generic front/rear fallback ----
+  // Generic front/rear fallback
   if (hasRear) return "rear";
   if (hasFront) return "front";
 
@@ -119,10 +114,31 @@ function DiagramNode({ part }) {
 
 function App() {
   const [files, setFiles] = useState([]);
-  const [vehicleInfo, setVehicleInfo] = useState(""); // year / make / model
+  const [previewUrls, setPreviewUrls] = useState([]); // {id, url}[]
+  const [vehicleInfo, setVehicleInfo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState(null); // holds backend JSON
+  const [result, setResult] = useState(null); // backend JSON
+
+  // Build image preview URLs whenever files change
+  useEffect(() => {
+    if (!files || files.length === 0) {
+      setPreviewUrls([]);
+      return;
+    }
+
+    const mapped = files.map((file) => ({
+      id: `${file.name}-${file.lastModified}`,
+      url: URL.createObjectURL(file),
+    }));
+
+    setPreviewUrls(mapped);
+
+    // Clean up object URLs on change/unmount
+    return () => {
+      mapped.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+  }, [files]);
 
   const handleFileChange = (event) => {
     setError("");
@@ -131,7 +147,6 @@ function App() {
     const selected = Array.from(event.target.files || []);
 
     setFiles((prev) => {
-      // avoid exact duplicates (same name + lastModified)
       const existingKeys = new Set(
         prev.map((f) => `${f.name}-${f.lastModified}`)
       );
@@ -147,7 +162,7 @@ function App() {
       return merged;
     });
 
-    // reset the input so picking the same file again will fire onChange
+    // reset input so picking same file again will fire onChange
     event.target.value = "";
   };
 
@@ -155,6 +170,12 @@ function App() {
     setFiles([]);
     setResult(null);
     setError("");
+  };
+
+  const handleRemoveFile = (id) => {
+    setFiles((prev) =>
+      prev.filter((file) => `${file.name}-${file.lastModified}` !== id)
+    );
   };
 
   const handleSubmit = async (event) => {
@@ -169,11 +190,10 @@ function App() {
 
     const formData = new FormData();
     files.forEach((file) => {
-      // field name must match FastAPI parameter: files: List[UploadFile]
+      // backend FastAPI parameter is: files: List[UploadFile]
       formData.append("files", file);
     });
 
-    // optional vehicle_info field for the backend
     if (vehicleInfo.trim()) {
       formData.append("vehicle_info", vehicleInfo.trim());
     }
@@ -186,7 +206,6 @@ function App() {
       });
 
       if (!response.ok) {
-        // Try to parse JSON error
         let detail = `Request failed with status ${response.status}`;
         try {
           const errJson = await response.json();
@@ -197,7 +216,7 @@ function App() {
                 : JSON.stringify(errJson.detail);
           }
         } catch {
-          // ignore JSON parse error
+          // ignore parse error
         }
         throw new Error(detail);
       }
@@ -256,33 +275,64 @@ function App() {
                 </label>
                 <p className="hint">
                   You can select several photos at once. On some phones you may
-                  need to tap “Choose Files” multiple times to add more images.
+                  need to tap “Choose Images” multiple times to add more images.
                 </p>
-                <input
-                  id="fileInput"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileChange}
-                />
+
+                <div className="file-input-row">
+                  {/* Hidden real input */}
+                  <input
+                    id="fileInput"
+                    className="file-input-hidden"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileChange}
+                  />
+
+                  {/* Styled button that opens the file picker */}
+                  <label htmlFor="fileInput" className="file-upload-button">
+                    {files.length > 0 ? "Add more images" : "Choose images"}
+                  </label>
+
+                  <span className="file-upload-label">
+                    {files.length > 0
+                      ? `${files.length} image${
+                          files.length > 1 ? "s" : ""
+                        } selected`
+                      : "No images selected yet"}
+                  </span>
+                </div>
+
                 {files.length > 0 && (
                   <div className="selected-files">
-                    <p className="hint">
-                      Selected {files.length} file
-                      {files.length > 1 ? "s" : ""}:
-                    </p>
-                    <ul>
-                      {files.map((f) => (
-                        <li key={`${f.name}-${f.lastModified}`}>{f.name}</li>
+                    <div className="thumbnail-grid">
+                      {previewUrls.map((p) => (
+                        <div className="thumb" key={p.id}>
+                          <img src={p.url} alt="" />
+                          <button
+                            type="button"
+                            className="thumb-remove"
+                            onClick={() => handleRemoveFile(p.id)}
+                            aria-label="Remove this image"
+                          >
+                            <span className="thumb-remove-icon" />
+                          </button>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
+
+                    <p className="hint" style={{ marginTop: "0.4rem" }}>
+                      {files.length} image
+                      {files.length > 1 ? "s" : ""} selected
+                    </p>
+
                     <button
                       type="button"
                       className="secondary-button"
                       onClick={handleClearFiles}
                       disabled={isSubmitting}
                     >
-                      Clear files
+                      Clear Images
                     </button>
                   </div>
                 )}

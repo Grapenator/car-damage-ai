@@ -33,7 +33,7 @@ function ImageUploadForm({
         </label>
         <p className="hint">
           You can select several photos at once. On some phones you may need to
-          tap “Choose Files” multiple times to add more images.
+          tap “Choose Images” multiple times to add more images.
         </p>
         <input
           id="fileInput"
@@ -58,7 +58,7 @@ function ImageUploadForm({
               onClick={onClearFiles}
               disabled={isSubmitting}
             >
-              Clear files
+              Clear images
             </button>
           </div>
         )}

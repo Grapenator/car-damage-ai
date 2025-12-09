@@ -240,7 +240,7 @@ function App() {
     <div className="page-root">
       <div className="app">
         <header className="app-header">
-          <h1>Car Damage Analyzer</h1>
+          <h1>Vehicle Damage Analyzer</h1>
           <p>
             Upload one or more photos of the <strong>same car</strong>. The AI
             will estimate damaged parts, severity, and repair costs, then log a

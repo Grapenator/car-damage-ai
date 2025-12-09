@@ -13,7 +13,7 @@ from services.sheets_service import write_damage_report
 load_dotenv()
 
 app = FastAPI(
-    title="Car Damage Analyzer API",
+    title="Vehicle Damage Analyzer API",
     description=(
         "Upload car images, analyze damage with OpenAI, and log reports to "
         "Google Sheets."
@@ -84,7 +84,7 @@ def _recompute_costs(damage_report: dict) -> dict:
 async def health_check():
     return {
         "status": "ok",
-        "message": "Car damage API is running",
+        "message": "Vehicle damage API is running",
     }
 
 

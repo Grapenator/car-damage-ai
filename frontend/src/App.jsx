@@ -347,140 +347,145 @@ function App() {
           </section>
 
           {result && (
-            <section className="card">
+            <section className="card damage-card">
               <h2>Damage Report</h2>
 
-              <div className="summary">
-                <p>
-                  <strong>Report ID:</strong> {result.report_id}
-                </p>
-                <p>
-                  <strong>Notes:</strong> {result.damage_report?.notes}
-                </p>
-                {overallCost !== null && (
+              {/* Scrollable content area */}
+              <div className="damage-scroll">
+                <div className="summary">
                   <p>
-                    <strong>Overall Estimated Repair Cost:</strong>{" "}
-                    ${Number(overallCost).toLocaleString()}
+                    <strong>Report ID:</strong> {result.report_id}
                   </p>
+                  <p>
+                    <strong>Notes:</strong> {result.damage_report?.notes}
+                  </p>
+                  {overallCost !== null && (
+                    <p>
+                      <strong>Overall Estimated Repair Cost:</strong>{" "}
+                      ${Number(overallCost).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                <h3>Damaged Parts</h3>
+                {parts.length === 0 ? (
+                  <p>No damaged parts detected.</p>
+                ) : (
+                  <div className="table-wrapper">
+                    {/* this div is the *only* horizontal scroller for the table */}
+                    <table className="damage-table">
+                      <thead>
+                        <tr>
+                          <th>Part Name</th>
+                          <th>Description</th>
+                          <th>Severity (1–5)</th>
+                          <th>Material Cost ($)</th>
+                          <th>Paint Cost ($)</th>
+                          <th>Structural Cost ($)</th>
+                          <th>Total Part Cost ($)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parts.map((part, idx) => (
+                          <tr key={idx}>
+                            <td>{part.part_name}</td>
+                            <td>{part.damage_description}</td>
+                            <td>{part.severity}</td>
+                            <td>{part.estimated_material_cost}</td>
+                            <td>{part.estimated_paint_cost}</td>
+                            <td>{part.estimated_structural_cost}</td>
+                            <td>{part.estimated_total_part_cost}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {parts.length > 0 && (
+                  <>
+                    <h3 className="diagram-heading">Damage Diagram</h3>
+                    <p className="hint">
+                      Parts are grouped by where they sit on the car. Darker borders mean higher severity.
+                    </p>
+
+                    <div className="diagram-scroll">
+                      <div className="diagram-layout">
+                        <div className="diagram-zone zone-front">
+                          <div className="zone-title">Front</div>
+                          {zones.front.length === 0 ? (
+                            <p className="zone-empty">No front damage</p>
+                          ) : (
+                            zones.front.map((p, i) => (
+                              <DiagramNode key={`front-${i}`} part={p} />
+                            ))
+                          )}
+                        </div>
+
+                        <div className="diagram-zone zone-left">
+                          <div className="zone-title">Left Side</div>
+                          {zones.left.length === 0 ? (
+                            <p className="zone-empty">No left-side damage</p>
+                          ) : (
+                            zones.left.map((p, i) => (
+                              <DiagramNode key={`left-${i}`} part={p} />
+                            ))
+                          )}
+                        </div>
+
+                        <div className="diagram-center">
+                          <span>Vehicle</span>
+                        </div>
+
+                        <div className="diagram-zone zone-right">
+                          <div className="zone-title">Right Side</div>
+                          {zones.right.length === 0 ? (
+                            <p className="zone-empty">No right-side damage</p>
+                          ) : (
+                            zones.right.map((p, i) => (
+                              <DiagramNode key={`right-${i}`} part={p} />
+                            ))
+                          )}
+                        </div>
+
+                        <div className="diagram-zone zone-rear">
+                          <div className="zone-title">Rear</div>
+                          {zones.rear.length === 0 ? (
+                            <p className="zone-empty">No rear damage</p>
+                          ) : (
+                            zones.rear.map((p, i) => (
+                              <DiagramNode key={`rear-${i}`} part={p} />
+                            ))
+                          )}
+                        </div>
+
+                        <div className="diagram-zone zone-other">
+                          <div className="zone-title">Other / Unknown</div>
+                          {zones.other.length === 0 ? (
+                            <p className="zone-empty">None</p>
+                          ) : (
+                            zones.other.map((p, i) => (
+                              <DiagramNode key={`other-${i}`} part={p} />
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {result.sheet_url && (
+                  <div className="sheet-link">
+                    <a
+                      href={result.sheet_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open full report in Google Sheets
+                    </a>
+                  </div>
                 )}
               </div>
-
-              <h3>Damaged Parts</h3>
-              {parts.length === 0 ? (
-                <p>No damaged parts detected.</p>
-              ) : (
-                <div className="table-wrapper">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Part Name</th>
-                        <th>Description</th>
-                        <th>Severity (1–5)</th>
-                        <th>Material Cost ($)</th>
-                        <th>Paint Cost ($)</th>
-                        <th>Structural Cost ($)</th>
-                        <th>Total Part Cost ($)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {parts.map((part, idx) => (
-                        <tr key={idx}>
-                          <td>{part.part_name}</td>
-                          <td>{part.damage_description}</td>
-                          <td>{part.severity}</td>
-                          <td>{part.estimated_material_cost}</td>
-                          <td>{part.estimated_paint_cost}</td>
-                          <td>{part.estimated_structural_cost}</td>
-                          <td>{part.estimated_total_part_cost}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {parts.length > 0 && (
-                <>
-                  <h3 className="diagram-heading">Damage Diagram</h3>
-                  <p className="hint">
-                    Parts are grouped by where they sit on the car. Darker
-                    borders mean higher severity.
-                  </p>
-
-                  <div className="diagram-layout">
-                    <div className="diagram-zone zone-front">
-                      <div className="zone-title">Front</div>
-                      {zones.front.length === 0 ? (
-                        <p className="zone-empty">No front damage</p>
-                      ) : (
-                        zones.front.map((p, i) => (
-                          <DiagramNode key={`front-${i}`} part={p} />
-                        ))
-                      )}
-                    </div>
-
-                    <div className="diagram-zone zone-left">
-                      <div className="zone-title">Left Side</div>
-                      {zones.left.length === 0 ? (
-                        <p className="zone-empty">No left-side damage</p>
-                      ) : (
-                        zones.left.map((p, i) => (
-                          <DiagramNode key={`left-${i}`} part={p} />
-                        ))
-                      )}
-                    </div>
-
-                    <div className="diagram-center">
-                      <span>Vehicle</span>
-                    </div>
-
-                    <div className="diagram-zone zone-right">
-                      <div className="zone-title">Right Side</div>
-                      {zones.right.length === 0 ? (
-                        <p className="zone-empty">No right-side damage</p>
-                      ) : (
-                        zones.right.map((p, i) => (
-                          <DiagramNode key={`right-${i}`} part={p} />
-                        ))
-                      )}
-                    </div>
-
-                    <div className="diagram-zone zone-rear">
-                      <div className="zone-title">Rear</div>
-                      {zones.rear.length === 0 ? (
-                        <p className="zone-empty">No rear damage</p>
-                      ) : (
-                        zones.rear.map((p, i) => (
-                          <DiagramNode key={`rear-${i}`} part={p} />
-                        ))
-                      )}
-                    </div>
-
-                    <div className="diagram-zone zone-other">
-                      <div className="zone-title">Other / Unknown</div>
-                      {zones.other.length === 0 ? (
-                        <p className="zone-empty">None</p>
-                      ) : (
-                        zones.other.map((p, i) => (
-                          <DiagramNode key={`other-${i}`} part={p} />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {result.sheet_url && (
-                <div className="sheet-link">
-                  <a
-                    href={result.sheet_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open full report in Google Sheets
-                  </a>
-                </div>
-              )}
             </section>
           )}
         </main>

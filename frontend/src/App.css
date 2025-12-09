@@ -5,18 +5,10 @@
   background-color: #0f172a;
 }
 
-/* Make sizing predictable everywhere */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
 body {
   margin: 0;
   background: radial-gradient(circle at top, #1e293b, #020617);
   color: #e5e7eb;
-  overflow-x: hidden; /* prevent sideways scroll from any tiny overflow */
 }
 
 /* Center the app on the page */
@@ -33,7 +25,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  margin: 1.5rem; /* spacing from edges of the viewport */
+  margin: 1.5rem;
 }
 
 .app-header {
@@ -59,20 +51,13 @@ body {
   gap: 1.5rem;
 }
 
+/* NOTE: no overflow:hidden here so inner scroll areas can show */
 .card {
   background: rgba(15, 23, 42, 0.95);
   border-radius: 1rem;
   padding: 1.5rem;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(148, 163, 184, 0.25);
-  width: 100%;
-}
-
-/* Make any images behave nicely by default */
-img {
-  max-width: 100%;
-  height: auto;
-  display: block;
 }
 
 .card h2 {
@@ -143,11 +128,12 @@ button:not(:disabled):hover {
   color: #9ca3af;
 }
 
+/* ---------- FILE UPLOAD + THUMBNAILS ---------- */
+
 .selected-files {
   margin-top: 0.5rem;
 }
 
-/* grid of image thumbnails */
 .thumbnail-grid {
   display: flex;
   flex-wrap: wrap;
@@ -180,10 +166,10 @@ button:not(:disabled):hover {
   right: 6px;
   width: 24px;
   height: 24px;
-  padding: 0; /* override global button padding */
+  padding: 0;
   border-radius: 999px;
   border: none;
-  background: rgba(239, 68, 68, 0.95); /* red */
+  background: rgba(239, 68, 68, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,10 +185,9 @@ button:not(:disabled):hover {
   width: 12px;
   height: 2px;
   border-radius: 999px;
-  background: #f9fafb; /* white minus bar */
+  background: #f9fafb;
 }
 
-/* Show/remove button on hover or keyboard focus (desktop) */
 .thumb:hover .thumb-remove,
 .thumb:focus-within .thumb-remove {
   opacity: 1;
@@ -210,10 +195,11 @@ button:not(:disabled):hover {
   box-shadow: 0 6px 12px rgba(239, 68, 68, 0.6);
 }
 
-/* Make sure global button hover doesn't override ours */
 .thumb-remove:hover {
   transform: translateY(0);
 }
+
+/* ---------- ERROR ---------- */
 
 .error {
   margin-top: 1rem;
@@ -225,17 +211,17 @@ button:not(:disabled):hover {
   font-size: 0.9rem;
 }
 
-/* Upload row: keep it from overflowing the card */
+/* ---------- FILE INPUT ROW ---------- */
+
 .file-input-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
   margin-top: 0.25rem;
-  width: 100%;
 }
 
-/* Visually hide the native input but keep it accessible */
+/* hide native input but keep accessible */
 .file-input-hidden {
   position: absolute;
   width: 1px;
@@ -247,7 +233,6 @@ button:not(:disabled):hover {
   border: 0;
 }
 
-/* Pretty upload button */
 .file-upload-button {
   display: inline-flex;
   align-items: center;
@@ -262,8 +247,6 @@ button:not(:disabled):hover {
   cursor: pointer;
   white-space: nowrap;
   transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease;
-  flex: 0 0 auto;
-  max-width: 100%;
 }
 
 .file-upload-button:hover {
@@ -279,57 +262,64 @@ button:not(:disabled):hover {
 .file-upload-label {
   font-size: 0.85rem;
   color: #9ca3af;
-  flex: 1 1 0;
-  min-width: 0;
-  word-break: break-word;
 }
+
+/* ---------- SUMMARY ---------- */
 
 .summary p {
   margin: 0.25rem 0;
 }
 
-/* Make table scroll inside card instead of blowing out layout */
+/* ---------- TABLE: HORIZONTAL SCROLL ---------- */
+
 .table-wrapper {
   margin-top: 0.75rem;
-  width: 100%;
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-table {
+/* this class must be on the <table> */
+.damage-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
-  min-width: 600px; /* allows scroll on very small screens instead of squishing too hard */
+  min-width: 800px; /* force scroll on phones */
 }
 
-th,
-td {
+.damage-table th,
+.damage-table td {
   padding: 0.5rem 0.6rem;
   border-bottom: 1px solid rgba(55, 65, 81, 0.8);
   text-align: left;
 }
 
-th {
+.damage-table th {
   background: rgba(31, 41, 55, 0.9);
   position: sticky;
   top: 0;
   z-index: 1;
 }
 
-tr:nth-child(even) td {
+.damage-table tr:nth-child(even) td {
   background: rgba(15, 23, 42, 0.6);
 }
 
-/* -------- Damage diagram styles -------- */
+/* ---------- DAMAGE DIAGRAM: HORIZONTAL SCROLL ---------- */
 
 .diagram-heading {
   margin-top: 1.5rem;
 }
 
+.diagram-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin-top: 0.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+
 .diagram-layout {
-  margin-top: 0.75rem;
+  margin-top: 0.25rem;
   display: grid;
   grid-template-areas:
     ". front ."
@@ -339,8 +329,7 @@ tr:nth-child(even) td {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   align-items: stretch;
-  width: 100%;
-  max-width: 100%;
+  min-width: 800px; /* wider than phone so it scrolls */
 }
 
 .diagram-zone {
@@ -365,8 +354,6 @@ tr:nth-child(even) td {
   font-size: 0.8rem;
   color: #6b7280;
 }
-
-/* Grid areas */
 
 .zone-front {
   grid-area: front;
@@ -463,7 +450,7 @@ tr:nth-child(even) td {
   border-color: rgba(239, 68, 68, 0.9);
 }
 
-/* Sheet link */
+/* ---------- SHEET LINK ---------- */
 
 .sheet-link {
   margin-top: 1rem;
@@ -479,20 +466,11 @@ tr:nth-child(even) td {
   text-decoration: underline;
 }
 
-/* ---------- Mobile tweaks ---------- */
+/* ---------- MOBILE TWEAKS ---------- */
 
 @media (max-width: 640px) {
-  .page-root {
-    align-items: stretch; /* let content go full-width top-to-bottom */
-  }
-
-  .app {
-    margin: 1rem 0.75rem;
-    min-height: auto;
-  }
-
   .app-main {
-    padding: 0;
+    padding: 1rem;
   }
 
   .card {
@@ -503,56 +481,9 @@ tr:nth-child(even) td {
     font-size: 1.6rem;
   }
 
-  .app-header p {
-    font-size: 0.9rem;
-  }
-
-  button {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .file-input-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .file-upload-button {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .file-upload-label {
-    font-size: 0.8rem;
-  }
-
-  .thumbnail-grid {
-    gap: 0.5rem;
-  }
-
-  .thumb {
-    width: 80px;
-    height: 80px;
-  }
-
-  /* Show remove button always on mobile (no hover) */
+  /* always show remove icon on touch */
   .thumb-remove {
     opacity: 1;
     transform: translateY(0);
-  }
-
-  table {
-    font-size: 0.8rem;
-  }
-
-  .diagram-layout {
-    grid-template-areas:
-      "center"
-      "front"
-      "left"
-      "right"
-      "rear"
-      "other";
-    grid-template-columns: 1fr;
   }
 }

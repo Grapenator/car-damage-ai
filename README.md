@@ -1,7 +1,7 @@
-# 🚗💥 Car Damage AI  
+# 🚗💥 Auto Scans AI  
 **AI-powered vehicle damage detection from images**
 
-Car Damage AI is a full-stack web application that lets users upload car photos and instantly receive an **AI-generated damage analysis**. The system identifies dents, scratches, cracks, bumper impacts, and other common collision damage. The frontend is deployed on Vercel with a custom domain, and the backend is powered by FastAPI on Render.
+Auto Scans AI is a full-stack web application that lets users upload car photos and instantly receive an **AI-generated damage analysis**. The system identifies dents, scratches, cracks, bumper impacts, and other common collision damage. The frontend is deployed on Vercel with a custom domain, and the backend is powered by FastAPI on Render.
 
 🔗 **Live App:** https://autoscansai.com  
 

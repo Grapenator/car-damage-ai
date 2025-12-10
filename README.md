@@ -38,6 +38,7 @@ Auto Scans AI is a full-stack web application that lets users upload car photos 
 
 ## 📂 Project Structure
 
+```text
 car-damage-ai/
 ├── backend/
 │   ├── __pycache__/
@@ -70,7 +71,7 @@ car-damage-ai/
 │
 ├── .gitignore                # repo-level gitignore
 └── README.md                 # ← this file (repo-level readme)
-
+```
 ---
 
 ## 🚀 Running the Project Locally

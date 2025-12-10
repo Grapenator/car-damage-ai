@@ -120,6 +120,32 @@ function App() {
   const [error, setError] = useState("");
   const [result, setResult] = useState(null); // backend JSON
 
+  // track if backend seems awake
+  const [backendReady, setBackendReady] = useState(false);
+
+  // Warm-up ping on mount so the cold-start happens before user clicks Analyze
+  useEffect(() => {
+    let cancelled = false;
+
+    const pingBackend = async () => {
+      try {
+        await fetch(`${API_BASE_URL}/`);
+        if (!cancelled) {
+          setBackendReady(true);
+        }
+      } catch (e) {
+        console.warn("Backend warm-up ping failed (likely cold start):", e);
+        // We just leave backendReady = false; analyze handler has retry logic.
+      }
+    };
+
+    pingBackend();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Build image preview URLs whenever files change
   useEffect(() => {
     if (!files || files.length === 0) {
@@ -200,28 +226,46 @@ function App() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/analyze`, {
-        method: "POST",
-        body: formData,
-      });
+      const doRequest = async () => {
+        const response = await fetch(`${API_BASE_URL}/analyze`, {
+          method: "POST",
+          body: formData,
+        });
 
-      if (!response.ok) {
-        let detail = `Request failed with status ${response.status}`;
-        try {
-          const errJson = await response.json();
-          if (errJson.detail) {
-            detail =
-              typeof errJson.detail === "string"
-                ? errJson.detail
-                : JSON.stringify(errJson.detail);
+        if (!response.ok) {
+          let detail = `Request failed with status ${response.status}`;
+          try {
+            const errJson = await response.json();
+            if (errJson.detail) {
+              detail =
+                typeof errJson.detail === "string"
+                  ? errJson.detail
+                  : JSON.stringify(errJson.detail);
+            }
+          } catch {
+            // ignore JSON parse error
           }
-        } catch {
-          // ignore parse error
+          throw new Error(detail);
         }
-        throw new Error(detail);
+
+        return response.json();
+      };
+
+      let data;
+
+      try {
+        // First attempt (may hit cold start)
+        data = await doRequest();
+      } catch (firstErr) {
+        console.warn(
+          "First /analyze request failed, retrying once (likely cold start)…",
+          firstErr
+        );
+        // Second attempt – by now backend should be awake
+        data = await doRequest();
       }
 
-      const data = await response.json();
+      setBackendReady(true);
       setResult(data);
     } catch (err) {
       console.error("Analyze error:", err);
@@ -251,6 +295,14 @@ function App() {
         <main className="app-main">
           <section className="card">
             <h2>Upload images</h2>
+
+            {!backendReady && (
+              <p className="hint" style={{ marginBottom: "0.75rem" }}>
+                Warming up the analysis server… your first run may take a bit
+                longer.
+              </p>
+            )}
+
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label htmlFor="vehicleInfo">
@@ -401,7 +453,8 @@ function App() {
                   <>
                     <h3 className="diagram-heading">Damage Diagram</h3>
                     <p className="hint">
-                      Parts are grouped by where they sit on the car. Darker borders mean higher severity.
+                      Parts are grouped by where they sit on the car. Darker
+                      borders mean higher severity.
                     </p>
 
                     <div className="diagram-scroll">

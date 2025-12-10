@@ -38,17 +38,38 @@ Auto Scans AI is a full-stack web application that lets users upload car photos 
 
 ## 📂 Project Structure
 
-    car-damage-ai/
-    ├── src/
-    │   ├── components/
-    │   ├── App.jsx
-    │   ├── main.jsx
-    │   └── styles/
-    │
-    ├── public/
-    ├── README.md
-    ├── package.json
-    └── vite.config.js
+car-damage-ai/
+├── backend/
+│   ├── __pycache__/
+│   ├── services/
+│   ├── venv/                 # local virtual environment (not committed if gitignored)
+│   ├── .env                  # backend env vars (not committed)
+│   ├── main.py               # FastAPI entrypoint
+│   ├── requirements.txt      # Python dependencies
+│   └── service-account.json  # credentials/config for external services
+│
+├── frontend/
+│   ├── dist/                 # production build output
+│   ├── node_modules/
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── .env.local            # local frontend env vars
+│   ├── .env.production       # production frontend env vars
+│   ├── .gitignore
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── README.md             # (optional) frontend-only readme
+│   └── vite.config.js
+│
+├── .gitignore                # repo-level gitignore
+└── README.md                 # ← this file (repo-level readme)
 
 ---
 

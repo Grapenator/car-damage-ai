@@ -22,9 +22,16 @@ app = FastAPI(
 )
 
 origins = [
+    # Local development (Vite)
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+
+    # Vercel default domain
     "https://car-damage-ai.vercel.app",
+
+    # Custom domain
+    "https://autoscansai.com",
+    "https://www.autoscansai.com",
 ]
 
 # Allow local dev + future frontend origins
